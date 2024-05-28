@@ -1,0 +1,45 @@
+version: "3"
+
+services:
+  traefik:
+    image: traefik:v3.0
+    ports:
+      - "8085:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+
+  auth:
+    build: ./go-auth
+    environment:
+      - SECRET=secret-key
+      - BASE_URL=http://example.com:8085
+      - OIDC_ISSUER=https://gitlab.com
+      - OIDC_CLIENT_ID=xxxxxxx
+      - OIDC_CLIENT_SECRET=xxxxxxx
+      - ALLOWED_EMAIL_DOMAINS=myemaildomain.com
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=Host(`example.com`)"
+
+  whoami1:
+    image: containous/whoami
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.whoami1.rule=Host(`test1.example.com`)"
+      - "traefik.http.routers.whoami1.middlewares=traefik-forward-auth1"
+      - "traefik.http.middlewares.traefik-forward-auth-whoami1.forwardauth.address=http://auth:3000?group=group1"
+
+  whoami2:
+    image: containous/whoami
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.whoami2.rule=Host(`test2.example.com`)"
+      - "traefik.http.routers.whoami2.middlewares=traefik-forward-auth1"
+      - "traefik.http.middlewares.traefik-forward-auth-whoami2.forwardauth.address=http://auth:3000?group=group2"
